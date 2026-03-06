@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CASE_DECISION_RECORDED",
+  "type": "object",
+  "required": ["schemaVersion", "caseId", "orgId", "decisionId", "decision", "decidedBy", "decidedAt"],
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "1.0" },
+    "caseId": { "type": "string" },
+    "orgId": { "type": "string" },
+    "decisionId": { "type": "string" },
+    "decision": { "type": "string", "enum": ["APPROVED", "DECLINED", "ESCALATED"] },
+    "decidedBy": { "type": "string" },
+    "decidedAt": { "type": "string", "format": "date-time" }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "@faststart/shared",
+  "version": "1.0.0",
+  "description": "Shared lib for tenant, idempotency, audit, observability, db",
+  "main": "index.js",
+  "type": "module",
+  "exports": {
+    "./tenant": "./tenant.js",
+    "./idempotency": "./idempotency.js",
+    "./audit": "./audit.js",
+    "./observability": "./observability.js",
+    "./db": "./db.js"
+  }
+}

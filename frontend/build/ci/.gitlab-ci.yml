@@ -1,0 +1,144 @@
+# FastStart – GitLab CI/CD
+# Separate infrastructure deployment and application (Lambda) deployment.
+# Repository is in GitLab; no GitHub workflows.
+# Location: build/ci/.gitlab-ci.yml — set this path in GitLab: Settings → CI/CD → General pipelines → CI configuration file.
+
+variables:
+  AWS_REGION: us-east-1
+  TF_VERSION: "1.5"
+  NODE_VERSION: "20"
+  ENVIRONMENT: dev
+  PROJECT_NAME: FastStart
+  # Lambda name prefix must match Terraform (e.g. FastStart-dev)
+
+stages:
+  - validate
+  - plan
+  - build
+  - deploy-infra
+  - deploy-app
+
+# —— Validate (MRs) ——
+validate:terraform:
+  stage: validate
+  image:
+    name: hashicorp/terraform:${TF_VERSION}
+    entrypoint: [""]
+  script:
+    - cd build/infrastructure/terraform/environments/dev
+    - terraform init -backend=false
+    - terraform validate
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+# —— Plan (MRs) ——
+plan:terraform:
+  stage: plan
+  image:
+    name: hashicorp/terraform:${TF_VERSION}
+    entrypoint: [""]
+  before_script:
+    - cd build/infrastructure/terraform/environments/dev
+    - terraform init
+  script:
+    - terraform plan -no-color -out=tfplan -var-file=terraform.tfvars 2>/dev/null || terraform plan -no-color -out=tfplan
+  artifacts:
+    paths:
+      - build/infrastructure/terraform/environments/dev/tfplan
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+# —— Build (default branch) ——
+build:api:
+  stage: build
+  image: node:${NODE_VERSION}-alpine
+  script:
+    - cd build/api && npm ci
+    - cp -r ../shared/nodejs ./shared
+    - npm run build 2>/dev/null || true
+    - cd ../.. && mkdir -p dist
+    - cd build/api && zip -r ../../dist/api.zip src node_modules package.json shared -x "*.git*" 2>/dev/null || zip -r ../../dist/api.zip . -x "*.git*"
+  artifacts:
+    paths:
+      - dist/api.zip
+    name: api-zip
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+build:agents:
+  stage: build
+  image: node:${NODE_VERSION}-alpine
+  script:
+    - cd build/agents && npm ci
+    - cd ../.. && mkdir -p dist
+    - cd build/agents && zip -r ../../dist/agents.zip . -x "*.git*"
+  artifacts:
+    paths:
+      - dist/agents.zip
+    name: agents-zip
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+build:ui:
+  stage: build
+  image: node:${NODE_VERSION}-alpine
+  script:
+    - cd build/ui && npm ci && npm run build
+  artifacts:
+    paths:
+      - build/ui/.next
+      - build/ui/package.json
+      - build/ui/public
+    name: ui-build
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+# —— Deploy Infrastructure (Terraform apply) ——
+deploy:infra:
+  stage: deploy-infra
+  image:
+    name: hashicorp/terraform:${TF_VERSION}
+    entrypoint: [""]
+  before_script:
+    - cd build/infrastructure/terraform/environments/dev
+    - terraform init
+  script:
+    - terraform plan -no-color -out=tfplan -var-file=terraform.tfvars 2>/dev/null || terraform plan -no-color -out=tfplan
+    - terraform apply -auto-approve tfplan
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+
+# —— Deploy Application (Lambda code update) ——
+# Updates Lambda function code from built zips. Run after deploy:infra when app code changes.
+deploy:lambda:
+  stage: deploy-app
+  image: alpine:latest
+  dependencies:
+    - build:api
+    - build:agents
+  before_script:
+    - apk add --no-cache aws-cli
+  script:
+    - PREFIX="${PROJECT_NAME}-${ENVIRONMENT}"
+    - |
+      for fn in api application-init application-finalize; do
+        aws lambda update-function-code --function-name "${PREFIX}-${fn}" --zip-file fileb://dist/api.zip --region $AWS_REGION || true
+      done
+    - |
+      for fn in failure-handler update-case-status document-validation data-extraction policy-evaluation case-summary; do
+        aws lambda update-function-code --function-name "${PREFIX}-${fn}" --zip-file fileb://dist/agents.zip --region $AWS_REGION || true
+      done
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+
+# Optional: DB migrations (set DATABASE_URL or use Terraform output in CI variables)
+# deploy:migrate:
+#   stage: deploy-app
+#   image: postgres:15-alpine
+#   script:
+#     - PGPASSWORD=... psql "$DATABASE_URL" -f build/database/migrations/001_initial.sql
+#   rules:
+#     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+#       when: manual

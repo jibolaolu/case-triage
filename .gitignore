@@ -1,0 +1,13 @@
+*/.idea
+*/.gitignore
+*/.terraform/*
+terraform/.terraform/*
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.backup
+terraform.tfvars
+lambda_src/*.zip
+__pycache__/
+*.pyc
+.idea/
+*.zip

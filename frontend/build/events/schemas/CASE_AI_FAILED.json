@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CASE_AI_FAILED",
+  "type": "object",
+  "required": ["schemaVersion", "caseId", "orgId", "stage", "errorCode", "failedAt"],
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "1.0" },
+    "caseId": { "type": "string" },
+    "orgId": { "type": "string" },
+    "stage": { "type": "string", "enum": ["document_validation", "data_extraction", "policy_evaluation", "case_summary"] },
+    "errorCode": { "type": "string" },
+    "errorMessage": { "type": "string" },
+    "failedAt": { "type": "string", "format": "date-time" },
+    "executionArn": { "type": "string" }
+  }
+}

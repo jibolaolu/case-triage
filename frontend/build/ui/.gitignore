@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js
+.next/
+out/
+
+# Production
+build
+dist
+
+# Misc
+.DS_Store
+*.pem
+next-env.d.ts

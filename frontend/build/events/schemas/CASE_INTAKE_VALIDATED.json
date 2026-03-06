@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CASE_INTAKE_VALIDATED",
+  "type": "object",
+  "required": ["schemaVersion", "caseId", "orgId", "caseType", "policyVersion", "validatedAt"],
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "1.0" },
+    "caseId": { "type": "string" },
+    "orgId": { "type": "string" },
+    "caseType": { "type": "string" },
+    "policyVersion": { "type": "integer" },
+    "validatedAt": { "type": "string", "format": "date-time" },
+    "documentCount": { "type": "integer" }
+  }
+}
