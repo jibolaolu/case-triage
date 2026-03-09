@@ -20,7 +20,7 @@ const ROLE_COLORS: Record<UserRole, string> = {
 };
 
 export default function AdminUsersPage() {
-  const { data: usersData, isLoading } = useUsers();
+  const { data: usersData, isLoading } = useUsers() as { data: { users?: MockUser[] } | undefined; isLoading: boolean };
   const createUserMutation = useCreateUser();
   const updateRoleMutation = useUpdateUserRole();
   const updateStatusMutation = useUpdateUserStatus();
