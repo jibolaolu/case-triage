@@ -43,7 +43,7 @@ export default function SettingsPage() {
     }
   }, [profile, user?.name]);
 
-  const initials = (nameFromProfile || user?.name ?? '')
+  const initials = (nameFromProfile || (user?.name ?? ''))
     .split(' ')
     .map((n) => n[0])
     .join('')
@@ -270,3 +270,4 @@ export default function SettingsPage() {
     </div>
   );
 }
+//last line
