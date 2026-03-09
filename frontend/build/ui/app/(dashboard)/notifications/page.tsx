@@ -30,9 +30,9 @@ export default function NotificationsPage() {
 
  useEffect(() => {
   const source = apiNotifs?.notifications
-    ? apiNotifs.notifications.map((n) => ({ ...n, visibleTo: [] }))
+    ? apiNotifs.notifications.map((n) => ({ ...n, visibleTo: [] as string[], type: n.type as NotificationType }))
     : (user ? getNotificationsForRole(user.role) : []);
-  setNotifications(source);
+  setNotifications(source as MockNotification[]);
 }, [apiNotifs, user]);
 
   const filtered = useMemo(() => {
