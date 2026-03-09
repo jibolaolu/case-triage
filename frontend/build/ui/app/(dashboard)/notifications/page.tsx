@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getNotificationsForRole } from '@/data/mockData';
 import { useNotifications, useMarkNotificationRead } from '@/hooks/useNotifications';
-import type { NotificationType, MockNotification } from '@/types';
+import type { NotificationType, MockNotification, UserRole } from '@/types';
 
 const TYPE_CONFIG: Record<NotificationType, { icon: string; bg: string; border: string; label: string }> = {
   USER_CREATED:         { icon: '👤+',  bg: 'bg-fast-purple-light', border: 'border-fast-admin',     label: 'User Created' },
@@ -32,7 +32,7 @@ export default function NotificationsPage() {
     const source: MockNotification[] = apiNotifs?.notifications
       ? apiNotifs.notifications.map((n) => ({
           ...n,
-          visibleTo: [] as string[],
+          visibleTo: [] as UserRole[],
           type: n.type as NotificationType,
         }))
       : (user ? getNotificationsForRole(user.role) : []);
