@@ -28,10 +28,12 @@ export default function NotificationsPage() {
     user ? getNotificationsForRole(user.role) : []
   );
 
-  useEffect(() => {
-    const source = apiNotifs?.notifications ?? (user ? getNotificationsForRole(user.role) : []);
-    setNotifications(source);
-  }, [apiNotifs, user]);
+ useEffect(() => {
+  const source = apiNotifs?.notifications
+    ? apiNotifs.notifications.map((n) => ({ ...n, visibleTo: [] }))
+    : (user ? getNotificationsForRole(user.role) : []);
+  setNotifications(source);
+}, [apiNotifs, user]);
 
   const filtered = useMemo(() => {
     switch (activeTab) {
