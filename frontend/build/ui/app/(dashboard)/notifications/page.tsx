@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getNotificationsForRole } from '@/data/mockData';
 import { useNotifications, useMarkNotificationRead } from '@/hooks/useNotifications';
-import type { NotificationType } from '@/types';
+import type { NotificationType, MockNotification } from '@/types';
 
 const TYPE_CONFIG: Record<NotificationType, { icon: string; bg: string; border: string; label: string }> = {
   USER_CREATED:         { icon: '👤+',  bg: 'bg-fast-purple-light', border: 'border-fast-admin',     label: 'User Created' },
@@ -13,7 +13,7 @@ const TYPE_CONFIG: Record<NotificationType, { icon: string; bg: string; border: 
   ESCALATION_ASSIGNED:  { icon: '⬆️',   bg: 'bg-fast-orange-light', border: 'border-fast-escalated', label: 'Escalation' },
   CASE_APPROVED:        { icon: '✓',    bg: 'bg-fast-green-light',  border: 'border-fast-approved',  label: 'Case Approved' },
   CASE_DECLINED:        { icon: '✕',    bg: 'bg-fast-red-light',    border: 'border-fast-declined',  label: 'Case Declined' },
-  CASE_ASSIGNED:        { icon: '📋',   bg: 'bg-fast-teal-light',   border: 'border-fast-teal',       label: 'Case Assigned' },
+  CASE_ASSIGNED:        { icon: '📋',   bg: 'bg-fast-teal-light',   border: 'border-fast-teal',      label: 'Case Assigned' },
   DEADLINE_APPROACHING: { icon: '⏰',   bg: 'bg-fast-red-light',    border: 'border-fast-declined',  label: 'Deadline' },
 };
 
@@ -24,16 +24,20 @@ export default function NotificationsPage() {
   const { data: apiNotifs } = useNotifications();
   const markReadMutation = useMarkNotificationRead();
   const [activeTab, setActiveTab] = useState<FilterTab>('ALL');
-  const [notifications, setNotifications] = useState(() =>
+  const [notifications, setNotifications] = useState<MockNotification[]>(() =>
     user ? getNotificationsForRole(user.role) : []
   );
 
   useEffect(() => {
-  const source = apiNotifs?.notifications
-    ? apiNotifs.notifications.map((n) => ({ ...n, visibleTo: [] as string[], type: n.type as NotificationType }))
-    : (user ? getNotificationsForRole(user.role) : []);
-  setNotifications(source as MockNotification[]);
-}, [apiNotifs, user]);
+    const source: MockNotification[] = apiNotifs?.notifications
+      ? apiNotifs.notifications.map((n) => ({
+          ...n,
+          visibleTo: [] as string[],
+          type: n.type as NotificationType,
+        }))
+      : (user ? getNotificationsForRole(user.role) : []);
+    setNotifications(source);
+  }, [apiNotifs, user]);
 
   const filtered = useMemo(() => {
     switch (activeTab) {
@@ -59,9 +63,9 @@ export default function NotificationsPage() {
   };
 
   const tabs: { id: FilterTab; label: string }[] = [
-    { id: 'ALL',        label: `All (${notifications.length})` },
-    { id: 'UNREAD',     label: `Unread${unreadCount > 0 ? ` (${unreadCount})` : ''}` },
-    { id: 'SYSTEM',     label: 'System' },
+    { id: 'ALL',         label: `All (${notifications.length})` },
+    { id: 'UNREAD',      label: `Unread${unreadCount > 0 ? ` (${unreadCount})` : ''}` },
+    { id: 'SYSTEM',      label: 'System' },
     { id: 'ESCALATIONS', label: 'Escalations' },
     ...(user?.role !== 'ADMIN' ? [{ id: 'CASES' as FilterTab, label: 'Case Updates' }] : []),
   ];
