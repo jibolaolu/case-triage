@@ -62,14 +62,14 @@ module "iam" {
   account_id = local.account_id
   region     = local.region
 
-  s3_bucket_arn         = module.s3.documents_bucket_arn
-  dynamodb_table_arn    = module.dynamodb.table_arn
-  audit_trail_table_arn = module.dynamodb.audit_trail_table_arn
+  s3_bucket_arn           = module.s3.documents_bucket_arn
+  dynamodb_table_arn      = module.dynamodb.table_arn
+  audit_trail_table_arn   = module.dynamodb.audit_trail_table_arn
   notifications_table_arn = module.dynamodb.notifications_table_arn
-  sqs_queue_arns        = module.sqs.all_queue_arns
-  eventbridge_bus_arn   = module.eventbridge.bus_arn
-  step_functions_arn    = module.step_functions.state_machine_arn
-  cognito_user_pool_arn = try(module.cognito.user_pool_arn, "")
+  sqs_queue_arns          = module.sqs.all_queue_arns
+  eventbridge_bus_arn     = module.eventbridge.bus_arn
+  step_functions_arn      = module.step_functions.state_machine_arn
+  cognito_user_pool_arn   = try(module.cognito.user_pool_arn, "")
 
   # Aurora ARNs intentionally omitted here — would create a circular dependency
   # (aurora needs iam role, iam would need aurora ARNs).
@@ -203,7 +203,7 @@ module "api_cases" {
   region                       = local.region
   account_id                   = local.account_id
   api_gateway_id               = module.api_gateway.api_id
-  api_gateway_root_resource_id  = module.api_gateway.root_resource_id
+  api_gateway_root_resource_id = module.api_gateway.root_resource_id
   api_gateway_stage            = module.api_gateway.stage_name
   lambda_exec_role_arn         = module.iam.lambda_exec_role_arn
   dynamodb_table_name          = module.dynamodb.table_name
@@ -212,28 +212,28 @@ module "api_cases" {
   cognito_user_pool_arn = module.cognito.user_pool_arn
   enable_cognito_auth   = true
 
-  list_cases_invoke_arn          = module.lambda.list_cases_invoke_arn
-  list_cases_function_name       = module.lambda.list_cases_function_name
-  get_case_detail_invoke_arn     = module.lambda.get_case_detail_invoke_arn
-  get_case_detail_function_name  = module.lambda.get_case_detail_function_name
-  record_decision_invoke_arn     = module.lambda.record_decision_invoke_arn
-  record_decision_function_name  = module.lambda.record_decision_function_name
-  assign_case_invoke_arn         = module.lambda.assign_case_invoke_arn
-  assign_case_function_name      = module.lambda.assign_case_function_name
-  send_email_invoke_arn          = module.lambda.send_decision_email_invoke_arn
-  send_email_function_name       = module.lambda.send_decision_email_function_name
-  get_notifications_invoke_arn        = module.lambda.get_notifications_invoke_arn
-  get_notifications_function_name     = module.lambda.get_notifications_function_name
-  mark_notification_read_invoke_arn   = module.lambda.mark_notification_read_invoke_arn
+  list_cases_invoke_arn                = module.lambda.list_cases_invoke_arn
+  list_cases_function_name             = module.lambda.list_cases_function_name
+  get_case_detail_invoke_arn           = module.lambda.get_case_detail_invoke_arn
+  get_case_detail_function_name        = module.lambda.get_case_detail_function_name
+  record_decision_invoke_arn           = module.lambda.record_decision_invoke_arn
+  record_decision_function_name        = module.lambda.record_decision_function_name
+  assign_case_invoke_arn               = module.lambda.assign_case_invoke_arn
+  assign_case_function_name            = module.lambda.assign_case_function_name
+  send_email_invoke_arn                = module.lambda.send_decision_email_invoke_arn
+  send_email_function_name             = module.lambda.send_decision_email_function_name
+  get_notifications_invoke_arn         = module.lambda.get_notifications_invoke_arn
+  get_notifications_function_name      = module.lambda.get_notifications_function_name
+  mark_notification_read_invoke_arn    = module.lambda.mark_notification_read_invoke_arn
   mark_notification_read_function_name = module.lambda.mark_notification_read_function_name
-  list_users_invoke_arn          = module.lambda.list_users_invoke_arn
-  list_users_function_name       = module.lambda.list_users_function_name
-  manage_user_invoke_arn         = module.lambda.manage_user_invoke_arn
-  manage_user_function_name      = module.lambda.manage_user_function_name
-  manage_policy_invoke_arn       = module.lambda.manage_policy_invoke_arn
-  manage_policy_function_name    = module.lambda.manage_policy_function_name
-  user_profile_invoke_arn        = module.lambda.user_profile_invoke_arn
-  user_profile_function_name     = module.lambda.user_profile_function_name
+  list_users_invoke_arn                = module.lambda.list_users_invoke_arn
+  list_users_function_name             = module.lambda.list_users_function_name
+  manage_user_invoke_arn               = module.lambda.manage_user_invoke_arn
+  manage_user_function_name            = module.lambda.manage_user_function_name
+  manage_policy_invoke_arn             = module.lambda.manage_policy_invoke_arn
+  manage_policy_function_name          = module.lambda.manage_policy_function_name
+  user_profile_invoke_arn              = module.lambda.user_profile_invoke_arn
+  user_profile_function_name           = module.lambda.user_profile_function_name
 
   depends_on = [module.api_gateway]
 }
@@ -340,3 +340,4 @@ EOF
     module.api_cases
   ]
 }
+#end
