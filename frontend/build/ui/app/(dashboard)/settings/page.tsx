@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserProfile, useUpdateUserProfile } from '@/hooks/useUserProfile';
 
 const roleLabel: Record<string, string> = {
   ADMIN: 'Admin',
@@ -11,25 +12,60 @@ const roleLabel: Record<string, string> = {
 
 export default function SettingsPage() {
   const { user } = useAuth();
+  const { data: profile, isLoading: profileLoading } = useUserProfile();
+  const updateProfileMutation = useUpdateUserProfile();
+
   const [profileOpen, setProfileOpen] = useState(true);
   const [notifOpen, setNotifOpen] = useState(false);
   const [displayOpen, setDisplayOpen] = useState(false);
 
-  const nameParts = (user?.name ?? '').split(' ');
+  const nameFromProfile = profile?.name ?? user?.name ?? '';
+  const nameParts = nameFromProfile.split(' ');
   const firstName = nameParts[0] ?? '';
   const lastName = nameParts.slice(1).join(' ') || '';
 
   const [first, setFirst] = useState(firstName);
   const [last, setLast] = useState(lastName);
-  const [phone, setPhone] = useState('(555) 234-5678');
-  const [department, setDepartment] = useState('General Services');
+  const [phone, setPhone] = useState(profile?.phone ?? '(555) 234-5678');
+  const [department, setDepartment] = useState(profile?.department ?? 'General Services');
 
-  const initials = (user?.name ?? '')
+  useEffect(() => {
+    if (profile) {
+      const parts = (profile.name ?? '').split(' ');
+      setFirst(parts[0] ?? '');
+      setLast(parts.slice(1).join(' ') || '');
+      if (profile.phone) setPhone(profile.phone);
+      if (profile.department) setDepartment(profile.department);
+    } else if (user?.name) {
+      const parts = user.name.split(' ');
+      setFirst(parts[0] ?? '');
+      setLast(parts.slice(1).join(' ') || '');
+    }
+  }, [profile, user?.name]);
+
+  const initials = (nameFromProfile || user?.name ?? '')
     .split(' ')
     .map((n) => n[0])
     .join('')
     .toUpperCase()
     .slice(0, 2);
+
+  const handleSaveProfile = () => {
+    updateProfileMutation.mutate({
+      name: [first.trim(), last.trim()].filter(Boolean).join(' '),
+      phone: phone.trim() || undefined,
+      department: department.trim() || undefined,
+      preferences: profile?.preferences,
+    });
+  };
+
+  if (profileLoading && !profile) {
+    return (
+      <div className="p-6">
+        <div className="flex items-center justify-center py-12 text-fast-muted text-sm">Loading profile…</div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 flex flex-col lg:flex-row gap-6">
@@ -123,11 +159,21 @@ export default function SettingsPage() {
                   </div>
                 </div>
               </div>
+              {updateProfileMutation.isSuccess && (
+                <p className="text-sm text-fast-approved mb-2">Profile updated successfully.</p>
+              )}
+              {updateProfileMutation.isError && (
+                <p className="text-sm text-fast-declined mb-2">
+                  {updateProfileMutation.error instanceof Error ? updateProfileMutation.error.message : 'Failed to update profile'}
+                </p>
+              )}
               <button
                 type="button"
-                className="px-4 py-2 bg-fast-approved text-white rounded-md font-medium hover:bg-fast-teal transition-colors"
+                onClick={handleSaveProfile}
+                disabled={updateProfileMutation.isPending}
+                className="px-4 py-2 bg-fast-approved text-white rounded-md font-medium hover:bg-fast-teal transition-colors disabled:opacity-50"
               >
-                Save Changes
+                {updateProfileMutation.isPending ? 'Saving…' : 'Save Changes'}
               </button>
             </div>
           )}

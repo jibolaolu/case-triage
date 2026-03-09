@@ -1,7 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { mockUsers } from '@/data/mockData';
+import {
+  useUsers,
+  useCreateUser,
+  useUpdateUserRole,
+  useUpdateUserStatus,
+  useDeleteUser,
+} from '@/hooks/useUsers';
 import type { MockUser, UserRole } from '@/types';
 
 const ROLE_OPTIONS: UserRole[] = ['ADMIN', 'CASEWORKER', 'MANAGER'];
@@ -13,11 +20,22 @@ const ROLE_COLORS: Record<UserRole, string> = {
 };
 
 export default function AdminUsersPage() {
-  const [users, setUsers]             = useState<MockUser[]>(mockUsers);
+  const { data: usersData, isLoading } = useUsers();
+  const createUserMutation = useCreateUser();
+  const updateRoleMutation = useUpdateUserRole();
+  const updateStatusMutation = useUpdateUserStatus();
+  const deleteUserMutation = useDeleteUser();
+
+  const users = useMemo(
+    () => (usersData?.users?.length ? usersData.users : mockUsers),
+    [usersData]
+  );
+
   const [selected, setSelected]       = useState<Set<string>>(new Set());
   const [search, setSearch]           = useState('');
   const [roleFilter, setRoleFilter]   = useState('');
   const [showCreate, setShowCreate]   = useState(false);
+  const [createForm, setCreateForm]   = useState({ name: '', email: '', role: 'CASEWORKER', department: '' });
 
   // ── Filtering ──────────────────────────────────────────────────────
   const filtered = users.filter((u) => {
@@ -47,21 +65,21 @@ export default function AdminUsersPage() {
     });
   };
 
-  // ── Edit role inline ───────────────────────────────────────────────
+  // ── Edit role inline (API + optimistic) ─────────────────────────────
   const updateRole = (id: string, role: UserRole) => {
-    setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, role } : u)));
+    updateRoleMutation.mutate({ userId: id, role });
   };
 
-  // ── Bulk actions ───────────────────────────────────────────────────
+  // ── Bulk actions (API) ─────────────────────────────────────────────
   const bulkDeactivate = () => {
-    setUsers((prev) =>
-      prev.map((u) => selected.has(u.id) ? { ...u, status: 'INACTIVE' as const } : u)
-    );
+    selected.forEach((id) => {
+      updateStatusMutation.mutate({ userId: id, status: 'INACTIVE' });
+    });
     setSelected(new Set());
   };
 
   const bulkDelete = () => {
-    setUsers((prev) => prev.filter((u) => !selected.has(u.id)));
+    selected.forEach((id) => deleteUserMutation.mutate(id));
     setSelected(new Set());
   };
 
@@ -72,6 +90,14 @@ export default function AdminUsersPage() {
     manager:    users.filter((u) => u.role === 'MANAGER').length,
     admin:      users.filter((u) => u.role === 'ADMIN').length,
   };
+
+  if (isLoading && !usersData?.users?.length) {
+    return (
+      <div className="p-6">
+        <div className="flex items-center justify-center py-12 text-fast-muted text-sm">Loading users…</div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6">
@@ -257,21 +283,20 @@ export default function AdminUsersPage() {
                     <td className="px-4 py-3 text-right">
                       <button
                         onClick={() =>
-                          setUsers((prev) =>
-                            prev.map((u) =>
-                              u.id === user.id
-                                ? { ...u, status: u.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE' }
-                                : u
-                            )
-                          )
+                          updateStatusMutation.mutate({
+                            userId: user.id,
+                            status: user.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE',
+                          })
                         }
-                        className="text-xs text-fast-muted hover:text-fast-text underline mr-3"
+                        disabled={updateStatusMutation.isPending}
+                        className="text-xs text-fast-muted hover:text-fast-text underline mr-3 disabled:opacity-50"
                       >
                         {user.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
                       </button>
                       <button
-                        onClick={() => setUsers((prev) => prev.filter((u) => u.id !== user.id))}
-                        className="text-xs text-fast-declined hover:text-red-700 underline"
+                        onClick={() => deleteUserMutation.mutate(user.id)}
+                        disabled={deleteUserMutation.isPending}
+                        className="text-xs text-fast-declined hover:text-red-700 underline disabled:opacity-50"
                       >
                         Delete
                       </button>
@@ -301,6 +326,8 @@ export default function AdminUsersPage() {
                 <label className="block text-sm font-medium text-fast-text mb-1">Full Name</label>
                 <input
                   type="text"
+                  value={createForm.name}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))}
                   placeholder="e.g. Jane Smith"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-fast-teal"
                 />
@@ -309,13 +336,19 @@ export default function AdminUsersPage() {
                 <label className="block text-sm font-medium text-fast-text mb-1">Email Address</label>
                 <input
                   type="email"
+                  value={createForm.email}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, email: e.target.value }))}
                   placeholder="e.g. jane.smith@agency.gov"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-fast-teal"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-fast-text mb-1">Role</label>
-                <select className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-fast-teal">
+                <select
+                  value={createForm.role}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, role: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-fast-teal"
+                >
                   <option value="CASEWORKER">Caseworker</option>
                   <option value="MANAGER">Manager</option>
                   <option value="ADMIN">Admin</option>
@@ -325,11 +358,18 @@ export default function AdminUsersPage() {
                 <label className="block text-sm font-medium text-fast-text mb-1">Department</label>
                 <input
                   type="text"
+                  value={createForm.department}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, department: e.target.value }))}
                   placeholder="e.g. Benefits Processing"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-fast-teal"
                 />
               </div>
             </div>
+            {createUserMutation.isError && (
+              <p className="mt-2 text-sm text-fast-declined">
+                {createUserMutation.error instanceof Error ? createUserMutation.error.message : 'Failed to create user'}
+              </p>
+            )}
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => setShowCreate(false)}
@@ -338,10 +378,26 @@ export default function AdminUsersPage() {
                 Cancel
               </button>
               <button
-                onClick={() => setShowCreate(false)}
-                className="flex-1 px-4 py-2 bg-fast-approved text-white rounded-md text-sm font-semibold hover:bg-fast-teal transition-colors"
+                onClick={() => {
+                  createUserMutation.mutate(
+                    {
+                      name: createForm.name,
+                      email: createForm.email,
+                      role: createForm.role,
+                      department: createForm.department,
+                    },
+                    {
+                      onSuccess: () => {
+                        setShowCreate(false);
+                        setCreateForm({ name: '', email: '', role: 'CASEWORKER', department: '' });
+                      },
+                    }
+                  );
+                }}
+                disabled={!createForm.email || createUserMutation.isPending}
+                className="flex-1 px-4 py-2 bg-fast-approved text-white rounded-md text-sm font-semibold hover:bg-fast-teal transition-colors disabled:opacity-50"
               >
-                Send Invite
+                {createUserMutation.isPending ? 'Creating…' : 'Send Invite'}
               </button>
             </div>
           </div>

@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNotifications } from '@/hooks/useNotifications';
 import { getNotificationsForRole } from '@/data/mockData';
 
 type NavItem = {
@@ -89,8 +90,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const navItems = user.role === 'ADMIN' ? adminNav : user.role === 'MANAGER' ? managerNav : caseworkerNav;
 
-  // Unread notification count for badge
-  const unreadCount = getNotificationsForRole(user.role).filter((n) => !n.read).length;
+  // Unread notification count for badge (API first, fallback to mock)
+  const { data: notificationsData } = useNotifications();
+  const unreadCount = notificationsData?.notifications
+    ? notificationsData.notifications.filter((n) => !n.read).length
+    : getNotificationsForRole(user.role).filter((n) => !n.read).length;
   const navWithBadges = navItems.map((item) =>
     item.href === '/notifications' && unreadCount > 0
       ? { ...item, badge: unreadCount }

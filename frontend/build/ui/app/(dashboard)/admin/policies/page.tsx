@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { usePolicies, useDeletePolicy } from '@/hooks/usePolicies';
 
 type PolicyItem = {
   id: string;
@@ -37,10 +38,47 @@ function getStatus(effectiveTo: string): 'active' | 'expiring' | 'expired' {
   return 'active';
 }
 
+/** Map API policy to PolicyItem for display. */
+function apiPolicyToItem(p: { id: string; name?: string; category?: string; version?: string; status?: string; createdAt?: string }): PolicyItem {
+  const name = p.name || p.id;
+  const effectiveTo = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return {
+    id: p.id,
+    name,
+    category: p.category || 'General',
+    version: p.version || '1.0',
+    status: getStatus(effectiveTo),
+    filename: `${(name || p.id).toLowerCase().replace(/\s+/g, '-')}.yaml`,
+    size: '—',
+    date: p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
+    effectiveTo,
+    uploader: 'System',
+    content: undefined,
+  };
+}
+
 export default function AdminPoliciesPage() {
-  const [policies, setPolicies] = useState<PolicyItem[]>(() =>
+  const { data: policiesData } = usePolicies();
+  const deletePolicyMutation = useDeletePolicy();
+
+  const apiPoliciesList = useMemo(
+    () => (policiesData?.policies?.length ? policiesData.policies.map((p) => apiPolicyToItem(p as Parameters<typeof apiPolicyToItem>[0])) : []),
+    [policiesData]
+  );
+
+  const [localPolicies, setLocalPolicies] = useState<PolicyItem[]>(() =>
     initialPolicies.map((p) => ({ ...p, status: getStatus(p.effectiveTo) }))
   );
+
+  const policies = apiPoliciesList.length > 0 ? apiPoliciesList : localPolicies;
+
+  useEffect(() => {
+    if (apiPoliciesList.length > 0) return;
+    setLocalPolicies((prev) =>
+      prev.map((p) => ({ ...p, status: getStatus(p.effectiveTo) }))
+    );
+  }, [apiPoliciesList.length]);
+
   const [editPolicy, setEditPolicy] = useState<PolicyItem | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<PolicyItem | null>(null);
   const [viewPolicy, setViewPolicy] = useState<PolicyItem | null>(null);
@@ -50,15 +88,21 @@ export default function AdminPoliciesPage() {
   const expiredPolicies = policies.filter((p) => p.status === 'expired');
 
   const handleDelete = (policy: PolicyItem) => {
-    setPolicies((prev) => prev.filter((p) => p.id !== policy.id));
-    setDeleteConfirm(null);
+    if (apiPoliciesList.length > 0) {
+      deletePolicyMutation.mutate(policy.id, { onSettled: () => setDeleteConfirm(null) });
+    } else {
+      setLocalPolicies((prev) => prev.filter((p) => p.id !== policy.id));
+      setDeleteConfirm(null);
+    }
   };
 
   const handleEditSave = (updated: { name: string; category: string }) => {
     if (!editPolicy) return;
-    setPolicies((prev) =>
-      prev.map((p) => (p.id === editPolicy.id ? { ...p, name: updated.name, category: updated.category } : p))
-    );
+    if (apiPoliciesList.length === 0) {
+      setLocalPolicies((prev) =>
+        prev.map((p) => (p.id === editPolicy.id ? { ...p, name: updated.name, category: updated.category } : p))
+      );
+    }
     setEditPolicy(null);
   };
 

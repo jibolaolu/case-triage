@@ -15,8 +15,9 @@ export async function updateUserRole(userId: string, role: string): Promise<void
   await apiClient.put(`/admin/users/${userId}/role`, { role });
 }
 
+/** Spec: body is { active: boolean }. We map ACTIVE/INACTIVE for the UI. */
 export async function updateUserStatus(userId: string, status: 'ACTIVE' | 'INACTIVE'): Promise<void> {
-  await apiClient.put(`/admin/users/${userId}/status`, { status });
+  await apiClient.put(`/admin/users/${userId}/status`, { active: status === 'ACTIVE' });
 }
 
 export async function deleteUser(userId: string): Promise<void> {
