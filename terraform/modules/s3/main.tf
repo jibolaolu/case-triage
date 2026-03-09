@@ -8,7 +8,7 @@ variable "environment" {}
 # ─── Documents Bucket ─────────────────────────────────────────────────────────
 
 resource "aws_s3_bucket" "documents" {
-  bucket        = "${var.prefix}-validated-application-intake"
+  bucket        = "${var.prefix}-v1-validated-application-intake"
   force_destroy = var.environment != "prod"  # safety guard on prod
 }
 
@@ -115,7 +115,7 @@ resource "aws_s3_bucket_cors_configuration" "documents" {
 # ─── Audit Logs Bucket ────────────────────────────────────────────────────────
 
 resource "aws_s3_bucket" "audit_logs" {
-  bucket        = "${var.prefix}-audit-logs"
+  bucket        = "${var.prefix}-v1-audit-logs"
   force_destroy = var.environment != "prod"
 }
 
@@ -154,3 +154,5 @@ output "documents_bucket_name" { value = aws_s3_bucket.documents.id }
 output "documents_bucket_arn"  { value = aws_s3_bucket.documents.arn }
 output "audit_bucket_name"     { value = aws_s3_bucket.audit_logs.id }
 output "audit_bucket_arn"      { value = aws_s3_bucket.audit_logs.arn }
+
+#test

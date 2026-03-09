@@ -66,7 +66,7 @@ resource "aws_amplify_app" "portal" {
   build_spec = <<-YAML
     version: 1
     applications:
-      - appRoot: build/ui
+      - appRoot: frontend/build/ui
         frontend:
           phases:
             preBuild:
@@ -89,7 +89,7 @@ resource "aws_amplify_app" "portal" {
   environment_variables = {
     NEXT_PUBLIC_API_URL       = var.api_gateway_url
     NEXT_PUBLIC_ENVIRONMENT   = var.environment
-    AMPLIFY_MONOREPO_APP_ROOT = "build/ui"
+    AMPLIFY_MONOREPO_APP_ROOT = "frontend/build/ui"
     NEXT_PUBLIC_COGNITO_USER_POOL_ID = var.cognito_user_pool_id
     NEXT_PUBLIC_COGNITO_CLIENT_ID    = var.cognito_client_id
   }

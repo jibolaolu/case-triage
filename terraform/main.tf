@@ -262,8 +262,8 @@ module "amplify" {
   environment = var.environment
   region      = local.region
 
-  github_repository   = "https://github.com/Wajid-01/faststart-ai-build"
-  github_branch       = "main"
+  github_repository   = "https://github.com/jibolaolu/case-triage"
+  github_branch       = "master"
   github_access_token = var.github_access_token
 
   api_gateway_url = module.api_gateway.base_url
