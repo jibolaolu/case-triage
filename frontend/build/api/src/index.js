@@ -34,6 +34,7 @@ export async function handler(event, context) {
   }
 
   try {
+    // ─── Application intake (spec 1–3) ───────────────────────────────────────
     if (path.startsWith('/applications/init') && method === 'POST') {
       return await import('./handlers/applicationInit.js').then(m => m.handler(event, context));
     }
@@ -43,15 +44,86 @@ export async function handler(event, context) {
     if (path.match(/^\/applications\/[^/]+\/decision$/) && method === 'GET') {
       return await import('./handlers/getDecision.js').then(m => m.handler(event, context));
     }
-    if (path === '/api/cases' && method === 'GET') {
+
+    // ─── Cases: support both /cases and /api/cases for spec alignment ──────────
+    const casesList = path === '/cases' || path === '/api/cases';
+    const caseIdSegment = path.match(/^\/(?:api\/)?cases\/([^/]+)(?:\/(.*))?$/);
+    const caseId = caseIdSegment?.[1];
+    const caseSubPath = caseIdSegment?.[2] || '';
+
+    if (casesList && method === 'GET') {
       return await import('./handlers/getCases.js').then(m => m.handler(event, context));
     }
-    if (path.match(/^\/api\/cases\/[^/]+$/) && method === 'GET') {
+    if (caseId && !caseSubPath && method === 'GET') {
       return await import('./handlers/getCaseDetail.js').then(m => m.handler(event, context));
     }
-    if (path.match(/^\/api\/cases\/[^/]+\/decision$/) && method === 'POST') {
+    if (caseId && caseSubPath === 'status' && method === 'GET') {
+      return await import('./handlers/getCaseStatus.js').then(m => m.handler(event, context));
+    }
+    if (caseId && caseSubPath === 'pack' && method === 'GET') {
+      return await import('./handlers/getCasePack.js').then(m => m.handler(event, context));
+    }
+    if (caseId && caseSubPath === 'decision' && method === 'POST') {
       return await import('./handlers/recordDecision.js').then(m => m.handler(event, context));
     }
+    if (caseId && caseSubPath === 'assign' && method === 'PUT') {
+      return await import('./handlers/assignCase.js').then(m => m.handler(event, context));
+    }
+    if (caseId && caseSubPath === 'email' && method === 'POST') {
+      return await import('./handlers/sendDecisionEmail.js').then(m => m.handler(event, context));
+    }
+
+    // ─── Notifications (spec 4) ───────────────────────────────────────────────
+    if (path === '/notifications' && method === 'GET') {
+      return await import('./handlers/getNotifications.js').then(m => m.handler(event, context));
+    }
+    if (path.match(/^\/notifications\/[^/]+\/read$/) && method === 'PUT') {
+      return await import('./handlers/markNotificationRead.js').then(m => m.handler(event, context));
+    }
+
+    // ─── Admin — Users (spec 5) ───────────────────────────────────────────────
+    if (path === '/admin/users' && method === 'GET') {
+      return await import('./handlers/listUsers.js').then(m => m.handler(event, context));
+    }
+    if (path === '/admin/users' && method === 'POST') {
+      return await import('./handlers/manageUser.js').then(m => m.handler(event, context));
+    }
+    if (path.match(/^\/admin\/users\/[^/]+\/role$/) && method === 'PUT') {
+      return await import('./handlers/manageUser.js').then(m => m.handler(event, context));
+    }
+    if (path.match(/^\/admin\/users\/[^/]+\/status$/) && method === 'PUT') {
+      return await import('./handlers/manageUser.js').then(m => m.handler(event, context));
+    }
+    if (path.match(/^\/admin\/users\/[^/]+$/) && method === 'DELETE') {
+      return await import('./handlers/manageUser.js').then(m => m.handler(event, context));
+    }
+
+    // ─── Admin — Policies (spec 6) ────────────────────────────────────────────
+    if (path === '/admin/policies' && method === 'GET') {
+      return await import('./handlers/managePolicy.js').then(m => m.handler(event, context));
+    }
+    if (path === '/admin/policies' && method === 'POST') {
+      return await import('./handlers/managePolicy.js').then(m => m.handler(event, context));
+    }
+    if (path.match(/^\/admin\/policies\/[^/]+$/) && method === 'GET') {
+      return await import('./handlers/managePolicy.js').then(m => m.handler(event, context));
+    }
+    if (path.match(/^\/admin\/policies\/[^/]+$/) && method === 'PUT') {
+      return await import('./handlers/managePolicy.js').then(m => m.handler(event, context));
+    }
+    if (path.match(/^\/admin\/policies\/[^/]+$/) && method === 'DELETE') {
+      return await import('./handlers/managePolicy.js').then(m => m.handler(event, context));
+    }
+
+    // ─── User profile (spec 7) ────────────────────────────────────────────────
+    if (path === '/users/me' && method === 'GET') {
+      return await import('./handlers/userProfile.js').then(m => m.handler(event, context));
+    }
+    if (path === '/users/me' && method === 'PUT') {
+      return await import('./handlers/userProfile.js').then(m => m.handler(event, context));
+    }
+
+    // ─── Legacy build path (invite) ───────────────────────────────────────────
     if (path === '/api/users/invite' && method === 'POST') {
       return await import('./handlers/inviteUser.js').then(m => m.handler(event, context));
     }

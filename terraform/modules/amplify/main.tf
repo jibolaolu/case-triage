@@ -14,6 +14,7 @@ variable "github_repository" {
 variable "github_branch" {
   description = "Git branch to deploy from"
   type        = string
+  default     = ""
 }
 
 variable "github_access_token" {
