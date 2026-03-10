@@ -128,6 +128,20 @@ def lambda_handler(event, context):
         )
         extracted_data = {r.get("field_name", ""): r.get("field_value") for r in ext_rows if r.get("field_name")}
 
+        def _from_extracted(*keys):
+            for k in keys:
+                v = extracted_data.get(k)
+                if v is not None and str(v).strip():
+                    return str(v).strip()
+            return None
+
+        # Map extracted_data to top-level applicant fields for portal display
+        applicant_name = (item.get("applicantName") or "").strip() or _from_extracted("full_name", "applicant_name", "name", "applicantName")
+        applicant_email = (item.get("applicantEmail") or "").strip() or _from_extracted("email", "applicant_email", "applicantEmail")
+        ni_number = _from_extracted("ni_number", "nino", "national_insurance_number", "nationalInsuranceNumber")
+        dob = _from_extracted("dob", "date_of_birth", "dateOfBirth", "birth_date")
+        phone = _from_extracted("phone", "phone_number", "telephone", "mobile", "contact_number")
+
         # 5. Aurora: eval_outcomes (policy evaluation)
         eval_rows = _rds_query(
             "SELECT rule_id, result, explanation, is_blocking FROM eval_outcomes WHERE case_id = :cid",
@@ -186,8 +200,8 @@ def lambda_handler(event, context):
             "caseId": case_id,
             "status": item.get("status", ""),
             "priority": item.get("priority", "MEDIUM"),
-            "applicantName": item.get("applicantName", ""),
-            "applicantEmail": item.get("applicantEmail", ""),
+            "applicantName": applicant_name or "",
+            "applicantEmail": applicant_email or "",
             "applicationType": item.get("applicationType") or case_row.get("case_type", ""),
             "assignedTo": item.get("assignedTo", ""),
             "assignedToName": item.get("assignedToName", ""),
@@ -203,6 +217,12 @@ def lambda_handler(event, context):
             "validationResults": validation_results,
             "auditTrail": audit_trail,
         }
+        if ni_number is not None:
+            detail["niNumber"] = ni_number
+        if dob is not None:
+            detail["dob"] = dob
+        if phone is not None:
+            detail["phone"] = phone
 
         return _response(200, detail)
 

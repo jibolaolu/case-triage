@@ -16,10 +16,10 @@ export default function CaseDetailPage() {
 
   const { data: apiCaseData, isLoading } = useCaseDetail(id);
   const caseData = apiCaseData
-    ? {
+    ? withApplicantDisplayFields({
         ...apiCaseData,
         id: apiCaseData.caseId || id,
-      }
+      })
     : getCaseById(id);
 
   if (isLoading) {
@@ -129,13 +129,13 @@ export default function CaseDetailPage() {
           <div className="bg-fast-panel rounded-lg shadow-card p-5">
             <h2 className="text-lg font-semibold text-fast-text mb-4">Applicant Information</h2>
             <div className="grid grid-cols-2 gap-4">
-              <InfoField label="Full Name"        value={caseData.applicantName} />
-              <InfoField label="NI Number"        value={caseData.niNumber ? maskNI(caseData.niNumber) : '—'} />
-              <InfoField label="Date of Birth"    value={caseData.dob ? formatDob(caseData.dob) : '—'} />
-              <InfoField label="Email"            value={caseData.applicantEmail} />
-              <InfoField label="Phone"            value={caseData.phone ?? '—'} />
-              <InfoField label="Application Type" value={caseData.applicationType} />
-              <InfoField label="Assigned To"      value={caseData.assignedToName} />
+              <InfoField label="Full Name"        value={caseData.applicantName || undefined} />
+              <InfoField label="NI Number"        value={caseData.niNumber ? maskNI(caseData.niNumber) : undefined} />
+              <InfoField label="Date of Birth"    value={caseData.dob ? formatDob(caseData.dob) : undefined} />
+              <InfoField label="Email"            value={caseData.applicantEmail || undefined} />
+              <InfoField label="Phone"            value={caseData.phone} />
+              <InfoField label="Application Type" value={caseData.applicationType || undefined} />
+              <InfoField label="Assigned To"      value={caseData.assignedToName || undefined} />
               <InfoField label="Date Submitted"   value={formatDate(caseData.createdAt)} />
             </div>
           </div>
@@ -322,11 +322,31 @@ export default function CaseDetailPage() {
   );
 }
 
-function InfoField({ label, value }: { label: string; value: string }) {
+/** Derive applicant display fields from API + extractedData so details are visible in the portal */
+function withApplicantDisplayFields<T extends Record<string, unknown>>(c: T): T {
+  const ext = (c.extractedData as Record<string, unknown> | undefined) ?? {};
+  const pick = (...keys: string[]): string | undefined => {
+    for (const k of keys) {
+      const v = ext[k] ?? (c as Record<string, unknown>)[k];
+      if (v != null && String(v).trim()) return String(v).trim();
+    }
+    return undefined;
+  };
+  return {
+    ...c,
+    applicantName: (c.applicantName as string)?.trim() || pick('full_name', 'applicant_name', 'name', 'applicantName') || '',
+    applicantEmail: (c.applicantEmail as string)?.trim() || pick('email', 'applicant_email', 'applicantEmail') || '',
+    niNumber: (c.niNumber as string) || pick('ni_number', 'nino', 'national_insurance_number', 'nationalInsuranceNumber'),
+    dob: (c.dob as string) || pick('dob', 'date_of_birth', 'dateOfBirth', 'birth_date'),
+    phone: (c.phone as string) || pick('phone', 'phone_number', 'telephone', 'mobile', 'contact_number'),
+  } as T;
+}
+
+function InfoField({ label, value }: { label: string; value: string | undefined }) {
   return (
     <div>
       <p className="text-xs text-fast-muted mb-0.5">{label}</p>
-      <p className="text-sm font-medium text-fast-text">{value}</p>
+      <p className="text-sm font-medium text-fast-text">{value ?? '—'}</p>
     </div>
   );
 }
