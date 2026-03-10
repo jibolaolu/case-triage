@@ -23,14 +23,20 @@ export function setCurrentUser(user: AuthUser): void {
 export function getAccessToken(): string | null {
   if (typeof window === 'undefined') return null;
   try {
-    const cognitoKeys = Object.keys(localStorage).filter(k =>
+    // 1. Look for Cognito IdToken first (what API Gateway Cognito authorizer validates)
+    const idTokenKey = Object.keys(localStorage).find(k =>
+      k.includes('CognitoIdentityServiceProvider') && k.endsWith('.idToken')
+    );
+    if (idTokenKey) return localStorage.getItem(idTokenKey);
+
+    // 2. Fallback: accessToken (some Amplify versions store it differently)
+    const accessTokenKey = Object.keys(localStorage).find(k =>
       k.includes('CognitoIdentityServiceProvider') && k.endsWith('.accessToken')
     );
-    if (cognitoKeys.length > 0) {
-      return localStorage.getItem(cognitoKeys[0]);
-    }
-    const token = localStorage.getItem('faststart_access_token');
-    return token;
+    if (accessTokenKey) return localStorage.getItem(accessTokenKey);
+
+    // 3. Last resort: manually stored token
+    return localStorage.getItem('faststart_access_token');
   } catch {
     return null;
   }
@@ -44,6 +50,7 @@ export function setAccessToken(token: string): void {
 export async function signOut(): Promise<void> {
   if (typeof window !== 'undefined') {
     localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem('faststart_access_token');
     window.location.href = '/login';
   }
 }
