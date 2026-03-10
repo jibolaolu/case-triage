@@ -61,12 +61,12 @@ resource "aws_iam_role_policy" "lambda_permissions" {
         Resource = [var.s3_bucket_arn, "${var.s3_bucket_arn}/*"]
       },
 
-      # DynamoDB — runtime state table
+      # DynamoDB — runtime state table (Scan required for list_cases when no status filter)
       {
         Sid    = "DynamoDBRuntimeState"
         Effect = "Allow"
         Action = ["dynamodb:GetItem", "dynamodb:PutItem",
-                  "dynamodb:UpdateItem", "dynamodb:Query"]
+                  "dynamodb:UpdateItem", "dynamodb:Query", "dynamodb:Scan"]
         Resource = [var.dynamodb_table_arn,
                     "${var.dynamodb_table_arn}/index/*"]
       },
