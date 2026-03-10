@@ -22,3 +22,21 @@ apiClient.interceptors.request.use((config) => {
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
+
+apiClient.interceptors.response.use(
+  (r) => r,
+  (err) => {
+    const status = err.response?.status;
+    const body = err.response?.data;
+    const msg =
+      status === 401
+        ? 'Unauthorized (401). Sign in with Cognito to load cases from the server.'
+        : status === 403
+          ? 'Forbidden (403). Check your permissions.'
+          : typeof body === 'object' && body?.error
+            ? String(body.error)
+            : err.message;
+    err.message = msg;
+    return Promise.reject(err);
+  }
+);

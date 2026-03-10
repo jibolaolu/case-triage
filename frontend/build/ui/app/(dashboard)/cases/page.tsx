@@ -18,20 +18,29 @@ export default function CasesPage() {
   const [priorityFilter, setPriority] = useState<string>('');
   const [page, setPage]             = useState(1);
 
-  const { data: apiData, isLoading } = useCases({ status: statusFilter || undefined });
+  const { data: apiData, isLoading, isError, error } = useCases({
+    status: statusFilter || undefined,
+    limit: 100,
+  });
 
-  const cases = apiData?.cases?.map((c) => ({
-    id: c.caseId,
-    applicantName: c.applicantName,
-    applicationType: c.applicationType,
-    status: c.status,
-    priority: c.priority,
-    assignedTo: c.assignedTo,
-    assignedToName: c.assignedToName,
-    createdAt: c.createdAt,
-    updatedAt: c.updatedAt,
-    aiConfidence: c.aiConfidence,
-  })) ?? mockCases;
+  const cases = (() => {
+    if (isError) return [];
+    if (apiData?.cases && Array.isArray(apiData.cases)) {
+      return apiData.cases.map((c) => ({
+        id: c.caseId,
+        applicantName: c.applicantName,
+        applicationType: c.applicationType,
+        status: c.status,
+        priority: c.priority,
+        assignedTo: c.assignedTo,
+        assignedToName: c.assignedToName,
+        createdAt: c.createdAt,
+        updatedAt: c.updatedAt,
+        aiConfidence: c.aiConfidence,
+      }));
+    }
+    return mockCases;
+  })();
 
   const filtered = useMemo(() => {
     return cases.filter((c) => {
@@ -61,6 +70,20 @@ export default function CasesPage() {
 
   return (
     <div className="p-6">
+      {/* API error: e.g. 401 when not signed in with Cognito — show message so new cases from API are not hidden by mock */}
+      {isError && (
+        <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-800">
+          <p className="font-semibold">Could not load cases from server</p>
+          <p className="text-sm mt-1">
+            {error instanceof Error ? error.message : 'Request failed.'}
+            {' '}Ensure <code className="bg-amber-100 px-1 rounded">NEXT_PUBLIC_API_URL</code> points to your API Gateway and sign in with Cognito to load real cases (including new ones from intake).
+          </p>
+          <p className="text-xs mt-2 text-amber-700">
+            Showing empty list. Fix the connection or sign in with Cognito to see cases.
+          </p>
+        </div>
+      )}
+
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-1">

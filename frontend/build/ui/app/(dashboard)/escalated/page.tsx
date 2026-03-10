@@ -11,7 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 export default function EscalatedCasesPage() {
   const router = useRouter();
   const { user, loading } = useAuth();
-  const { data: apiData } = useCases({ status: 'ESCALATED' });
+  const { data: apiData } = useCases({ status: 'ESCALATED', limit: 100 });
 
   // Escalated cases: Managers only — redirect Caseworker and Admin
   useEffect(() => {

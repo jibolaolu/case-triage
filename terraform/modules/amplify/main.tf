@@ -75,7 +75,14 @@ resource "aws_amplify_app" "portal" {
                 - npm install --legacy-peer-deps
             build:
               commands:
-                - env | grep -e NEXT_PUBLIC_ >> .env.production || true
+                - |
+                  echo "Ensuring NEXT_PUBLIC_* env vars for build..."
+                  touch .env.production
+                  [ -n "$NEXT_PUBLIC_API_URL" ] && echo "NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL" >> .env.production
+                  [ -n "$NEXT_PUBLIC_ENVIRONMENT" ] && echo "NEXT_PUBLIC_ENVIRONMENT=$NEXT_PUBLIC_ENVIRONMENT" >> .env.production
+                  [ -n "$NEXT_PUBLIC_COGNITO_USER_POOL_ID" ] && echo "NEXT_PUBLIC_COGNITO_USER_POOL_ID=$NEXT_PUBLIC_COGNITO_USER_POOL_ID" >> .env.production
+                  [ -n "$NEXT_PUBLIC_COGNITO_CLIENT_ID" ] && echo "NEXT_PUBLIC_COGNITO_CLIENT_ID=$NEXT_PUBLIC_COGNITO_CLIENT_ID" >> .env.production
+                  env | grep -e '^NEXT_PUBLIC_' >> .env.production || true
                 - npm run build
           artifacts:
             baseDirectory: .next

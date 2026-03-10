@@ -7,7 +7,7 @@ import { mockCases } from '@/data/mockData';
 export default function DashboardPage() {
   const { user } = useAuth();
 
-  const { data: apiData } = useCases();
+  const { data: apiData } = useCases({ limit: 100 });
   const allCases =
     apiData?.cases?.map((c) => ({
       id: c.caseId,
