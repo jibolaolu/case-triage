@@ -23,19 +23,62 @@ export function setCurrentUser(user: AuthUser): void {
 export function getAccessToken(): string | null {
   if (typeof window === 'undefined') return null;
   try {
-    // 1. Look for Cognito IdToken first (what API Gateway Cognito authorizer validates)
-    const idTokenKey = Object.keys(localStorage).find(k =>
+    const keys = Object.keys(localStorage);
+
+    // 1. Amplify v5 / Cognito hosted UI — idToken (used by API Gateway Cognito authorizer)
+    const idTokenKey = keys.find(k =>
       k.includes('CognitoIdentityServiceProvider') && k.endsWith('.idToken')
     );
-    if (idTokenKey) return localStorage.getItem(idTokenKey);
+    if (idTokenKey) {
+      const token = localStorage.getItem(idTokenKey);
+      if (token) return token;
+    }
 
-    // 2. Fallback: accessToken (some Amplify versions store it differently)
-    const accessTokenKey = Object.keys(localStorage).find(k =>
+    // 2. Amplify v6 — stores tokens under a different key pattern
+    const ampV6IdToken = keys.find(k =>
+      k.includes('amplify') && k.toLowerCase().includes('idtoken')
+    );
+    if (ampV6IdToken) {
+      const raw = localStorage.getItem(ampV6IdToken);
+      if (raw) {
+        try {
+          // Amplify v6 may store as JSON object with a 'value' field
+          const parsed = JSON.parse(raw);
+          if (parsed?.value) return parsed.value;
+          if (typeof parsed === 'string') return parsed;
+        } catch {
+          return raw; // plain string token
+        }
+      }
+    }
+
+    // 3. Amplify v5 accessToken fallback
+    const accessTokenKey = keys.find(k =>
       k.includes('CognitoIdentityServiceProvider') && k.endsWith('.accessToken')
     );
-    if (accessTokenKey) return localStorage.getItem(accessTokenKey);
+    if (accessTokenKey) {
+      const token = localStorage.getItem(accessTokenKey);
+      if (token) return token;
+    }
 
-    // 3. Last resort: manually stored token
+    // 4. Amplify v6 accessToken fallback
+    const ampV6AccessToken = keys.find(k =>
+      k.includes('amplify') && k.toLowerCase().includes('accesstoken')
+    );
+    if (ampV6AccessToken) {
+      const raw = localStorage.getItem(ampV6AccessToken);
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed?.value) return parsed.value;
+          if (typeof parsed === 'string') return parsed;
+        } catch {
+          return raw;
+        }
+      }
+    }
+
+    // 5. Last resort: manually stored token
     return localStorage.getItem('faststart_access_token');
   } catch {
     return null;
