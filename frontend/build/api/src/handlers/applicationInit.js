@@ -52,12 +52,41 @@ export async function handler(event, context) {
   const caseId = body.caseId ?? `HF-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const policyVersion = body.policyVersion ?? 1;
   const submissionType = body.submissionType || 'NEW';
-  const applicantRef = body.applicant ? [body.applicant.firstName, body.applicant.lastName].filter(Boolean).join(' ') || null : null;
+
+  // Extract all applicant fields from manifest
+  const applicant      = body.applicant || {};
+  const applicantRef   = [applicant.firstName, applicant.lastName].filter(Boolean).join(' ') || null;
+  const applicantName  = applicantRef;
+  const applicantEmail = applicant.email   || null;
+  const applicantPhone = applicant.phone   || null;
+  const applicantDob   = applicant.dob     || null;
+  const applicantNi    = applicant.nationalInsurance || null;
+  const applicantAddr  = applicant.address
+    ? JSON.stringify(applicant.address)
+    : null;
 
   await query(
-    `INSERT INTO cases (case_id, organisation_id, case_type_id, policy_id, policy_version, submission_type, applicant_reference, status, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
-    [caseId, orgId, caseTypeId, policyId, policyVersion, submissionType, applicantRef, 'INTAKE_IN_PROGRESS']
+    `INSERT INTO cases (
+       case_id, organisation_id, case_type_id, policy_id, policy_version,
+       submission_type, applicant_reference, applicant_name, applicant_email,
+       applicant_phone, applicant_dob, applicant_ni, applicant_address,
+       status, updated_at
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
+     ON CONFLICT (case_id) DO UPDATE SET
+       applicant_name    = EXCLUDED.applicant_name,
+       applicant_email   = EXCLUDED.applicant_email,
+       applicant_phone   = EXCLUDED.applicant_phone,
+       applicant_dob     = EXCLUDED.applicant_dob,
+       applicant_ni      = EXCLUDED.applicant_ni,
+       applicant_address = EXCLUDED.applicant_address,
+       updated_at        = NOW()`,
+    [
+      caseId, orgId, caseTypeId, policyId, policyVersion,
+      submissionType, applicantRef, applicantName, applicantEmail,
+      applicantPhone, applicantDob, applicantNi, applicantAddr,
+      'INTAKE_IN_PROGRESS'
+    ]
   );
 
   const docsToUpload = body['documents-to-upload'] || [];
