@@ -52,7 +52,15 @@ The Lambda must read from the **case_runtime_state** table (same one intake writ
 
 ---
 
-## 4. Auth (why you might see “Could not load cases from server”)
+## 4. "Network Error" vs "Unauthorized (401)"
+
+If you see **"Could not load cases from server - Network Error"**, the browser blocked the response because **API Gateway did not send CORS headers** on the error (e.g. 401). Without CORS, the browser hides the real status and body and reports "Network Error".
+
+**Fix applied in Terraform:** Gateway responses (UNAUTHORIZED, DEFAULT_4XX, etc.) now include `Access-Control-Allow-Origin` and `Access-Control-Allow-Headers`. After running `terraform apply`, redeploy the API (or let Terraform update the stage). Then 401/4xx responses will be visible to the app and you may see the clearer message: *"Unauthorized (401). Sign in with Cognito to load cases from the server."*
+
+---
+
+## 5. Auth (why you might see “Could not load cases from server”)
 
 GET /cases is protected by **Cognito**. If the portal uses **demo login** (pick a user, no real Cognito token), the request is sent **without a valid JWT** → API Gateway returns **401** → the portal shows the error banner and an empty list (no mock), so new cases don’t appear.
 
@@ -65,7 +73,7 @@ GET /cases is protected by **Cognito**. If the portal uses **demo login** (pick 
 
 ---
 
-## 5. Intake → same DynamoDB table
+## 6. Intake → same DynamoDB table
 
 New cases appear only if they’re written to the **same** table list_cases reads.
 
@@ -78,7 +86,7 @@ New cases appear only if they’re written to the **same** table list_cases read
 
 ---
 
-## 6. Summary
+## 7. Summary
 
 | # | Check | If wrong |
 |---|--------|----------|

@@ -155,11 +155,21 @@ resource "aws_api_gateway_model" "manifest" {
 
 # ─── Gateway Responses (standardised error format) ────────────────────────────
 
+# CORS headers for gateway responses so browser gets a proper response (not "Network Error")
+# when e.g. 401 is returned and the portal can show "Sign in with Cognito".
+locals {
+  gateway_response_cors = {
+    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'*'"
+    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,x-api-key'"
+  }
+}
+
 resource "aws_api_gateway_gateway_response" "bad_request" {
   rest_api_id   = aws_api_gateway_rest_api.intake.id
   response_type = "BAD_REQUEST_BODY"
   status_code   = "400"
 
+  response_parameters = local.gateway_response_cors
   response_templates = {
     "application/json" = jsonencode({
       error   = "Bad Request"
@@ -173,6 +183,7 @@ resource "aws_api_gateway_gateway_response" "unauthorized" {
   response_type = "UNAUTHORIZED"
   status_code   = "401"
 
+  response_parameters = local.gateway_response_cors
   response_templates = {
     "application/json" = jsonencode({
       error   = "Unauthorized"
@@ -186,12 +197,21 @@ resource "aws_api_gateway_gateway_response" "throttled" {
   response_type = "THROTTLED"
   status_code   = "429"
 
+  response_parameters = local.gateway_response_cors
   response_templates = {
     "application/json" = jsonencode({
       error   = "Too Many Requests"
       message = "Rate limit exceeded. Please retry after a short delay."
     })
   }
+}
+
+# Ensure all 4xx (e.g. 403 missing token) return CORS so the browser does not report "Network Error"
+resource "aws_api_gateway_gateway_response" "default_4xx" {
+  rest_api_id   = aws_api_gateway_rest_api.intake.id
+  response_type = "DEFAULT_4XX"
+
+  response_parameters = local.gateway_response_cors
 }
 
 # # Look up cases routes if they exist — won't fail if not yet deployed
