@@ -84,6 +84,9 @@ def lambda_handler(event, context):
                 "createdAt": item.get("createdAt", ""),
             })
 
+        # Sort newest first so new cases appear at the top (without deleting old ones)
+        cases.sort(key=lambda c: (c.get("updatedAt") or c.get("createdAt") or ""), reverse=True)
+
         next_token_out = None
         if last_key:
             next_token_out = base64.b64encode(json.dumps(last_key).encode("utf-8")).decode("utf-8")
