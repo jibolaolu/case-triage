@@ -84,6 +84,7 @@ def lambda_handler(event, context):
                 "applicationVersion": 1,
                 "createdAt":          now,
                 "updatedAt":          now,
+                "applicant":          body.get("applicant"),  # ← ADD THIS LINE
             },
             ConditionExpression="attribute_not_exists(caseId)"
         )

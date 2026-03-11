@@ -194,24 +194,40 @@ def lambda_handler(event, context):
                         return str(v).strip()
             return None
 
-        # Map to top-level applicant fields: prefer DynamoDB (set at intake/finalize), then extracted_data
-        applicant_name = (item.get("applicantName") or "").strip() or _from_extracted(
-            "full_name", "applicant_name", "name", "applicantName", "Full Name", "full name", "Applicant Name"
+        # Extract applicant fields - check DynamoDB 'applicant' nested object first
+        applicant_obj = item.get("applicant") or {}
+
+        applicant_name = (
+                                 (applicant_obj.get("firstName", "") + " " + applicant_obj.get("lastName", "")).strip()
+                                 or (item.get("applicantName") or "").strip()
+                                 or _from_extracted("full_name", "applicant_name", "name")
+                         ) or ""
+
+        applicant_email = (
+                applicant_obj.get("email")
+                or (item.get("applicantEmail") or "").strip()
+                or _from_extracted("email", "applicant_email")
         )
-        applicant_email = (item.get("applicantEmail") or "").strip() or _from_extracted(
-            "email", "applicant_email", "applicantEmail", "Email", "Email Address", "email_address", "contact_email"
+
+        ni_number = (
+                applicant_obj.get("nationalInsurance")
+                or _from_extracted("ni_number", "nino", "national_insurance_number")
         )
-        _ni = (item.get("niNumber") or item.get("ni_number") or "").strip()
-        ni_number = _ni or _from_extracted(
-            "ni_number", "nino", "national_insurance_number", "nationalInsuranceNumber",
-            "NI Number", "ni number", "National Insurance Number", "NIN", "national_insurance"
+
+        dob = (
+                applicant_obj.get("dob")
+                or _from_extracted("dob", "date_of_birth", "dateOfBirth")
         )
-        dob = (item.get("dob") or item.get("applicantDob") or item.get("dateOfBirth") or "").strip() or _from_extracted(
-            "dob", "date_of_birth", "dateOfBirth", "birth_date", "Date of Birth", "date of birth", "DOB"
+
+        phone = (
+                applicant_obj.get("phone")
+                or _from_extracted("phone", "phone_number", "telephone", "mobile")
         )
-        phone = (item.get("phone") or item.get("applicantPhone") or "").strip() or _from_extracted(
-            "phone", "phone_number", "telephone", "mobile", "contact_number", "Phone", "phone number",
-            "Contact Number", "contact_number", "mobile_number", "tel"
+
+        application_type = (
+                item.get("caseType")
+                or item.get("applicationType")
+                or case_row.get("case_type", "")
         )
 
         # 5. Aurora: eval_outcomes (policy evaluation)
@@ -263,10 +279,33 @@ def lambda_handler(event, context):
                     detail = {}
             audit_trail.append({"eventAt": a.get("eventAt"), "agent": a.get("agent"), "action": action, "detail": detail or {}})
 
-        # Build CaseDetail matching frontend types
+        # Build AI confidence from caseSummary in DynamoDB
         ai_confidence = item.get("aiConfidence")
         if ai_confidence is not None and isinstance(ai_confidence, Decimal):
             ai_confidence = float(ai_confidence)
+
+        # Fallback: parse from caseSummary JSON
+        if ai_confidence is None and item.get("caseSummary"):
+            try:
+                cs = item["caseSummary"]
+                cs_parsed = json.loads(cs) if isinstance(cs, str) else cs
+                # Path: data_quality_assessment.overall_confidence
+                dqa = cs_parsed.get("data_quality_assessment", {})
+                level = dqa.get("overall_confidence", "")
+                ai_confidence = {"LOW": 25, "MEDIUM": 60, "HIGH": 90}.get(level)
+            except Exception as ex:
+                print(f"WARN: caseSummary parse failed: {ex}")
+
+        # Also try Aurora case_summaries summary_json
+        if ai_confidence is None and summary_row.get("summary_json"):
+            try:
+                sj = summary_row["summary_json"]
+                sj_parsed = json.loads(sj) if isinstance(sj, str) else sj
+                dqa = sj_parsed.get("data_quality_assessment", {})
+                level = dqa.get("overall_confidence", "")
+                ai_confidence = {"LOW": 25, "MEDIUM": 60, "HIGH": 90}.get(level)
+            except Exception as ex:
+                print(f"WARN: summary_json parse failed: {ex}")
 
         application_type = item.get("applicationType") or item.get("caseType") or case_row.get("case_type", "")
         detail = {
