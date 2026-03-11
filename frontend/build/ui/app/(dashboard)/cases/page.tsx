@@ -192,14 +192,16 @@ export default function CasesPage() {
                     })}
                   </td>
                   <td className="px-4 py-3 text-sm text-right">
-                    {c.aiConfidence !== null ? (
-                      <span className={c.aiConfidence < 50 ? 'text-fast-declined font-medium' : 'text-fast-approved font-medium'}>
-                        {c.aiConfidence}%
-                      </span>
-                    ) : (
-                      <span className="text-fast-muted">—</span>
-                    )}
-                  </td>
+                    {(() => {
+                        const conf = c.aiConfidence;
+                    if (conf == null) return <span className="text-fast-muted">—</span>;
+                    return (
+                        <span className={conf < 50 ? 'text-fast-declined font-medium' : 'text-fast-approved font-medium'}>
+                            {conf}%
+                        </span>
+                    );
+                   })()}
+                </td>
                 </tr>
               ))
             )}
