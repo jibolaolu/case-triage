@@ -127,11 +127,15 @@ def lambda_handler(event, context):
     needs_sup  = summary.get("recommendation", {}).get("requires_supervisor_review", False)
 
     # ── Update DynamoDB runtime state ─────────────────────────────────────────
+    confidence_level = summary.get("data_quality_assessment", {}).get("overall_confidence", "")
+    ai_confidence_score = {"LOW": 25, "MEDIUM": 60, "HIGH": 90}.get(confidence_level)
+
     update_status(case_id, "READY_FOR_CASEWORKER_REVIEW", {
-        "caseSummary":             json.dumps(summary, cls=DecimalEncoder),
-        "casePackS3Key":           s3_key or "",
-        "priority":                priority,
+        "caseSummary": json.dumps(summary, cls=DecimalEncoder),
+        "casePackS3Key": s3_key or "",
+        "priority": priority,
         "requiresSupervisorReview": needs_sup,
+        "aiConfidence": ai_confidence_score,
     })
 
     # ── Write to Aurora case_summaries table (NEW) ────────────────────────────
