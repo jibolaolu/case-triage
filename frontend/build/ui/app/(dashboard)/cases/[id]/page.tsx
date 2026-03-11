@@ -134,8 +134,8 @@ export default function CaseDetailPage() {
               <InfoField label="Date of Birth"    value={caseData.dob ? formatDob(caseData.dob) : undefined} />
               <InfoField label="Email"            value={caseData.applicantEmail || undefined} />
               <InfoField label="Phone"            value={caseData.phone} />
-              <InfoField label="Application Type" value={caseData.applicationType || undefined} />
-              <InfoField label="Assigned To"      value={caseData.assignedToName || undefined} />
+              <InfoField label="Application Type" value={caseData.applicationType || formatCaseTypeFromCaseId(String((caseData as Record<string, unknown>).caseId ?? (caseData as Record<string, unknown>).id ?? '')) || undefined} />
+              <InfoField label="Assigned To"      value={caseData.assignedToName?.trim() || 'Unassigned'} />
               <InfoField label="Date Submitted"   value={formatDate(caseData.createdAt)} />
             </div>
           </div>
@@ -151,7 +151,8 @@ export default function CaseDetailPage() {
                     <div className="min-w-0">
                       <span className="text-sm font-medium text-fast-text block truncate">{doc.name}</span>
                       <span className="text-xs text-fast-muted">
-                        {doc.type} · {new Date(doc.uploadedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        {doc.type} · {(doc.uploadedAt && !isNaN(new Date(doc.uploadedAt).getTime()))
+                          ? formatDate(doc.uploadedAt) : 'Uploaded'}
                       </span>
                     </div>
                   </div>
@@ -322,23 +323,33 @@ export default function CaseDetailPage() {
   );
 }
 
-/** Derive applicant display fields from API + extractedData so details are visible in the portal */
+/** Derive applicant display fields from API + extractedData so client name/DOB etc. are visible to caseworker */
 function withApplicantDisplayFields<T extends Record<string, unknown>>(c: T): T {
   const ext = (c.extractedData as Record<string, unknown> | undefined) ?? {};
+  const norm = (k: string) => k.toLowerCase().replace(/\s+/g, '_').replace(/-/g, '_');
   const pick = (...keys: string[]): string | undefined => {
     for (const k of keys) {
       const v = ext[k] ?? (c as Record<string, unknown>)[k];
       if (v != null && String(v).trim()) return String(v).trim();
     }
+    const extNorm: Record<string, string> = {};
+    for (const [key, val] of Object.entries(ext)) {
+      if (key && val != null && String(val).trim()) extNorm[norm(key)] = String(val).trim();
+    }
+    for (const k of keys) {
+      const v = extNorm[norm(k)];
+      if (v) return v;
+    }
     return undefined;
   };
   return {
     ...c,
-    applicantName: (c.applicantName as string)?.trim() || pick('full_name', 'applicant_name', 'name', 'applicantName') || '',
-    applicantEmail: (c.applicantEmail as string)?.trim() || pick('email', 'applicant_email', 'applicantEmail') || '',
-    niNumber: (c.niNumber as string) || pick('ni_number', 'nino', 'national_insurance_number', 'nationalInsuranceNumber'),
-    dob: (c.dob as string) || pick('dob', 'date_of_birth', 'dateOfBirth', 'birth_date'),
-    phone: (c.phone as string) || pick('phone', 'phone_number', 'telephone', 'mobile', 'contact_number'),
+    applicantName: (c.applicantName as string)?.trim() || pick('full_name', 'applicant_name', 'name', 'applicantName', 'Full Name', 'full name', 'Applicant Name') || '',
+    applicantEmail: (c.applicantEmail as string)?.trim() || pick('email', 'applicant_email', 'applicantEmail', 'Email', 'Email Address', 'contact_email') || '',
+    applicationType: (c.applicationType as string)?.trim() || (c.caseType as string)?.trim() || pick('application_type', 'case_type', 'applicationType', 'caseType') || formatCaseTypeFromCaseId((c.caseId as string) || (c.id as string)),
+    niNumber: (c.niNumber as string) || pick('ni_number', 'nino', 'national_insurance_number', 'nationalInsuranceNumber', 'NI Number', 'ni number', 'National Insurance Number', 'NIN'),
+    dob: (c.dob as string) || pick('dob', 'date_of_birth', 'dateOfBirth', 'birth_date', 'Date of Birth', 'date of birth', 'DOB'),
+    phone: (c.phone as string) || pick('phone', 'phone_number', 'telephone', 'mobile', 'contact_number', 'Phone', 'phone number', 'Contact Number', 'mobile_number', 'tel'),
   } as T;
 }
 
@@ -358,9 +369,21 @@ function maskNI(ni: string) {
 }
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-GB', {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-GB', {
     day: '2-digit', month: 'short', year: 'numeric',
   });
+}
+
+/** Infer application type label from caseId when API returns none (e.g. COUNCILB-EMERGENC-2026-377373 → Emergency grant) */
+function formatCaseTypeFromCaseId(caseId: string): string {
+  if (!caseId || typeof caseId !== 'string') return '';
+  const u = caseId.toUpperCase();
+  if (u.includes('EMERGENC')) return 'Emergency grant';
+  if (u.includes('HOUSING') || u.includes('HOUSINGS')) return 'Housing support';
+  if (u.includes('HARDSHIP')) return 'Hardship fund';
+  return '';
 }
 
 function formatDob(dob: string) {

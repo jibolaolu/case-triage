@@ -110,7 +110,7 @@ def lambda_handler(event, context):
         )
         case_row = case_rows[0] if case_rows else {}
 
-        # 3. Aurora: documents
+        # 3. Aurora: documents (fallback: list S3 prefix when Aurora has none)
         doc_rows = _rds_query(
             "SELECT document_id, document_type, s3_key, s3_bucket FROM documents WHERE case_id = :cid",
             [_rds_param("cid", case_id)],
@@ -128,6 +128,29 @@ def lambda_handler(event, context):
                 "viewUrl": view_url,
                 "downloadUrl": view_url,
             })
+        if not documents:
+            org_id = item.get("orgId", "")
+            case_type = item.get("caseType", "")
+            prefix = f"{org_id}/{case_type}/{case_id}/documents/"
+            try:
+                paginator = s3_client.get_paginator("list_objects_v2")
+                for page in paginator.paginate(Bucket=DOCUMENTS_BUCKET, Prefix=prefix):
+                    for obj in page.get("Contents", []):
+                        key = obj.get("Key", "")
+                        if not key.endswith(".pdf"):
+                            continue
+                        name = key.rsplit("/", 1)[-1].replace(".pdf", "").replace("-", " ").title()
+                        view_url = _presign_url(DOCUMENTS_BUCKET, key)
+                        documents.append({
+                            "id": key,
+                            "name": name,
+                            "type": name,
+                            "uploadedAt": str(obj.get("LastModified", "")),
+                            "viewUrl": view_url,
+                            "downloadUrl": view_url,
+                        })
+            except Exception as e:
+                print(f"S3 list fallback for documents failed: {e}")
 
         # 4. Aurora: extracted_data
         ext_rows = _rds_query(
@@ -171,21 +194,24 @@ def lambda_handler(event, context):
                         return str(v).strip()
             return None
 
-        # Map extracted_data to top-level applicant fields for portal display (name/DOB visible to caseworker)
+        # Map to top-level applicant fields: prefer DynamoDB (set at intake/finalize), then extracted_data
         applicant_name = (item.get("applicantName") or "").strip() or _from_extracted(
             "full_name", "applicant_name", "name", "applicantName", "Full Name", "full name", "Applicant Name"
         )
         applicant_email = (item.get("applicantEmail") or "").strip() or _from_extracted(
-            "email", "applicant_email", "applicantEmail", "Email"
+            "email", "applicant_email", "applicantEmail", "Email", "Email Address", "email_address", "contact_email"
         )
-        ni_number = _from_extracted(
-            "ni_number", "nino", "national_insurance_number", "nationalInsuranceNumber", "NI Number", "ni number"
+        _ni = (item.get("niNumber") or item.get("ni_number") or "").strip()
+        ni_number = _ni or _from_extracted(
+            "ni_number", "nino", "national_insurance_number", "nationalInsuranceNumber",
+            "NI Number", "ni number", "National Insurance Number", "NIN", "national_insurance"
         )
-        dob = _from_extracted(
+        dob = (item.get("dob") or item.get("applicantDob") or item.get("dateOfBirth") or "").strip() or _from_extracted(
             "dob", "date_of_birth", "dateOfBirth", "birth_date", "Date of Birth", "date of birth", "DOB"
         )
-        phone = _from_extracted(
-            "phone", "phone_number", "telephone", "mobile", "contact_number", "Phone", "phone number"
+        phone = (item.get("phone") or item.get("applicantPhone") or "").strip() or _from_extracted(
+            "phone", "phone_number", "telephone", "mobile", "contact_number", "Phone", "phone number",
+            "Contact Number", "contact_number", "mobile_number", "tel"
         )
 
         # 5. Aurora: eval_outcomes (policy evaluation)
@@ -242,13 +268,15 @@ def lambda_handler(event, context):
         if ai_confidence is not None and isinstance(ai_confidence, Decimal):
             ai_confidence = float(ai_confidence)
 
+        application_type = item.get("applicationType") or item.get("caseType") or case_row.get("case_type", "")
         detail = {
             "caseId": case_id,
             "status": item.get("status", ""),
             "priority": item.get("priority", "MEDIUM"),
             "applicantName": applicant_name or "",
             "applicantEmail": applicant_email or "",
-            "applicationType": item.get("applicationType") or case_row.get("case_type", ""),
+            "applicationType": application_type,
+            "caseType": item.get("caseType", ""),
             "assignedTo": item.get("assignedTo", ""),
             "assignedToName": item.get("assignedToName", ""),
             "createdAt": item.get("createdAt", ""),
@@ -263,11 +291,11 @@ def lambda_handler(event, context):
             "validationResults": validation_results,
             "auditTrail": audit_trail,
         }
-        if ni_number is not None:
+        if ni_number:
             detail["niNumber"] = ni_number
-        if dob is not None:
+        if dob:
             detail["dob"] = dob
-        if phone is not None:
+        if phone:
             detail["phone"] = phone
 
         return _response(200, detail)

@@ -74,7 +74,7 @@ def lambda_handler(event, context):
             cases.append({
                 "caseId": item.get("caseId", ""),
                 "applicantName": item.get("applicantName", ""),
-                "applicationType": item.get("applicationType", ""),
+                "applicationType": item.get("applicationType") or item.get("caseType", ""),
                 "status": item.get("status", ""),
                 "priority": item.get("priority", ""),
                 "assignedTo": item.get("assignedTo", ""),

@@ -97,19 +97,30 @@ def lambda_handler(event, context):
             "missingDocs": missing_docs
         })
 
-    # ── 3. Update DynamoDB → INTAKE_VALIDATED ─────────────────────────────────
+    # ── 3. Update DynamoDB → INTAKE_VALIDATED (+ optional applicant details from intake) ──
     now = datetime.now(timezone.utc).isoformat()
+    optional = {
+        "applicantName": body.get("applicantName"),
+        "applicantEmail": body.get("applicantEmail"),
+        "dob": body.get("dob") or body.get("applicantDob") or body.get("dateOfBirth"),
+        "phone": body.get("phone") or body.get("applicantPhone"),
+        "niNumber": body.get("niNumber") or body.get("ni_number"),
+    }
+    set_parts = ["#s = :status", "updatedAt = :now"]
+    expr_names = {"#s": "status"}
+    expr_values = {":status": "INTAKE_VALIDATED", ":now": now, ":expected": "AWAITING_DOCUMENTS"}
+    for key, val in optional.items():
+        if val is not None and str(val).strip():
+            expr_names[f"#_{key}"] = key
+            set_parts.append(f"#_{key} = :{key}")
+            expr_values[f":{key}"] = str(val).strip()
     try:
         table.update_item(
             Key={"caseId": case_id},
-            UpdateExpression="SET #s = :status, updatedAt = :now",
-            ExpressionAttributeNames={"#s": "status"},
-            ExpressionAttributeValues={
-                ":status":   "INTAKE_VALIDATED",
-                ":now":      now,
-                ":expected": "AWAITING_DOCUMENTS"
-            },
-            ConditionExpression="#s = :expected"  # Optimistic locking
+            UpdateExpression="SET " + ", ".join(set_parts),
+            ExpressionAttributeNames=expr_names,
+            ExpressionAttributeValues=expr_values,
+            ConditionExpression="#s = :expected"
         )
     except ClientError as e:
         if e.response["Error"]["Code"] == "ConditionalCheckFailedException":
