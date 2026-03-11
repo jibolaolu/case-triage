@@ -61,16 +61,24 @@ def _rds_query(sql: str, params: list = None) -> list:
     }
     if params:
         kwargs["parameters"] = params
-    resp = rds_data.execute_statement(**kwargs)
-    cols = [c["name"] for c in resp.get("columnMetadata", [])]
-    rows = []
-    for rec in resp.get("records", []):
-        row = {}
-        for col, field in zip(cols, rec):
-            val = next(iter(field.values())) if field else None
-            row[col] = val
-        rows.append(row)
-    return rows
+    try:
+        resp = rds_data.execute_statement(**kwargs)
+        cols = [c["name"] for c in resp.get("columnMetadata", [])]
+        rows = []
+        for rec in resp.get("records", []):
+            row = {}
+            for col, field in zip(cols, rec):
+                # Handle isNull explicitly
+                if "isNull" in field and field["isNull"]:
+                    row[col] = None
+                else:
+                    row[col] = next(iter(field.values()))
+            rows.append(row)
+        print(f"RDS query OK: {sql[:60]} → {len(rows)} rows")
+        return rows
+    except Exception as e:
+        print(f"RDS QUERY FAILED: {sql[:60]} | ERROR: {str(e)}")
+        return []
 
 
 def _presign_url(bucket: str, key: str, ttl: int = PRESIGN_TTL) -> str:
@@ -128,19 +136,57 @@ def lambda_handler(event, context):
         )
         extracted_data = {r.get("field_name", ""): r.get("field_value") for r in ext_rows if r.get("field_name")}
 
+        # 4b. Fallback: merge DynamoDB item's extractedData (pipeline writes nested JSON by doc type)
+        ddb_extracted = item.get("extractedData")
+        if ddb_extracted:
+            try:
+                parsed = json.loads(ddb_extracted) if isinstance(ddb_extracted, str) else ddb_extracted
+                if isinstance(parsed, dict):
+                    for doc_type, fields in parsed.items():
+                        if isinstance(fields, dict) and "error" not in fields:
+                            for k, v in fields.items():
+                                if k and v is not None and str(v).strip() and k not in extracted_data:
+                                    extracted_data[k] = str(v).strip()
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        def _norm_key(k):
+            if not k:
+                return ""
+            return str(k).lower().replace(" ", "_").replace("-", "_")
+
         def _from_extracted(*keys):
+            # Try exact keys first
             for k in keys:
                 v = extracted_data.get(k)
                 if v is not None and str(v).strip():
                     return str(v).strip()
+            # Then try normalized (e.g. "Full Name" -> "full_name")
+            norm_map = {_norm_key(k): (k, v) for k, v in extracted_data.items() if k and v}
+            for k in keys:
+                n = _norm_key(k)
+                if n in norm_map:
+                    _, v = norm_map[n]
+                    if v and str(v).strip():
+                        return str(v).strip()
             return None
 
-        # Map extracted_data to top-level applicant fields for portal display
-        applicant_name = (item.get("applicantName") or "").strip() or _from_extracted("full_name", "applicant_name", "name", "applicantName")
-        applicant_email = (item.get("applicantEmail") or "").strip() or _from_extracted("email", "applicant_email", "applicantEmail")
-        ni_number = _from_extracted("ni_number", "nino", "national_insurance_number", "nationalInsuranceNumber")
-        dob = _from_extracted("dob", "date_of_birth", "dateOfBirth", "birth_date")
-        phone = _from_extracted("phone", "phone_number", "telephone", "mobile", "contact_number")
+        # Map extracted_data to top-level applicant fields for portal display (name/DOB visible to caseworker)
+        applicant_name = (item.get("applicantName") or "").strip() or _from_extracted(
+            "full_name", "applicant_name", "name", "applicantName", "Full Name", "full name", "Applicant Name"
+        )
+        applicant_email = (item.get("applicantEmail") or "").strip() or _from_extracted(
+            "email", "applicant_email", "applicantEmail", "Email"
+        )
+        ni_number = _from_extracted(
+            "ni_number", "nino", "national_insurance_number", "nationalInsuranceNumber", "NI Number", "ni number"
+        )
+        dob = _from_extracted(
+            "dob", "date_of_birth", "dateOfBirth", "birth_date", "Date of Birth", "date of birth", "DOB"
+        )
+        phone = _from_extracted(
+            "phone", "phone_number", "telephone", "mobile", "contact_number", "Phone", "phone number"
+        )
 
         # 5. Aurora: eval_outcomes (policy evaluation)
         eval_rows = _rds_query(
